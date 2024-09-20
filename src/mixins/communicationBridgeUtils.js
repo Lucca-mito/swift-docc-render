@@ -8,6 +8,8 @@
  * See https://swift.org/CONTRIBUTORS.txt for Swift project authors
 */
 
+import { runCustomScriptsForNewContent } from 'docc-render/utils/custom-scripts';
+
 export default {
   inject: {
     performanceMetricsEnabled: {
@@ -40,6 +42,15 @@ export default {
           time,
         },
       });
+
+      // Run custom scripts now that the page's content is in the DOM, so that they can customize
+      // it. When a page relies on data being provided via $bridge, this is first called before
+      // there's any content, so skip running custom scripts until there is.
+      if (this.topicData) {
+        runCustomScriptsForNewContent().catch((error) => {
+          console.error('Failed to run custom scripts:', error);
+        });
+      }
     },
     /**
      * @param {Object} data
