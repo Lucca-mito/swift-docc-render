@@ -10,7 +10,12 @@
 
 import assertIsArray from 'docc-render/utils/arrays';
 import { fetchLocalJSON, fetchLocalText } from 'docc-render/utils/fetch-local-text';
-import { copyPropertyIfPresent, has, mustNotHave } from 'docc-render/utils/object-properties';
+import {
+  copyPresentProperties,
+  copyPropertyIfPresent,
+  has,
+  mustNotHave,
+} from 'docc-render/utils/object-properties';
 import { resolveAbsoluteUrl } from 'docc-render/utils/url-helper';
 
 /**
@@ -74,15 +79,19 @@ function addScriptElement(customScript) {
 
     scriptElement.src = customScript.url;
 
-    copyPropertyIfPresent('async', customScript, scriptElement);
-    copyPropertyIfPresent('defer', customScript, scriptElement);
+    // We can't use copyPropertyIfPresent or copyPresentProperties for 'cross-origin' because
+    // customScript and scriptElement spell this property differently.
+    if (has(customScript, 'cross-origin')) {
+      scriptElement.crossOrigin = customScript['cross-origin'];
+    }
+
+    copyPresentProperties(['async', 'defer', 'integrity'], customScript, scriptElement);
   } else if (has(customScript, 'name')) {
     mustNotHave(customScript, 'code', 'Custom script cannot have both `name` and `code`.');
 
     scriptElement.src = urlGivenScriptName(customScript.name);
 
-    copyPropertyIfPresent('async', customScript, scriptElement);
-    copyPropertyIfPresent('defer', customScript, scriptElement);
+    copyPresentProperties(['async', 'defer'], customScript, scriptElement);
   } else if (has(customScript, 'code')) {
     mustNotHave(customScript, 'async', 'Inline script cannot be `async`.');
     mustNotHave(customScript, 'defer', 'Inline script cannot have `defer`.');
