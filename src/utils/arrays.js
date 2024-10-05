@@ -40,15 +40,3 @@ export function page(list, pageSize) {
   }
   return [...chunk(list, pageSize)];
 }
-
-/**
- * Throw an exception if the argument is not an array.
- * @param {object} object The object that may or may not be array.
- * @returns {object} The object, unmodified.
- */
-export function assertIsArray(object) {
-  if (!Array.isArray(object)) {
-    throw new Error(`${JSON.stringify(object)} is not an array.`);
-  }
-  return object;
-}

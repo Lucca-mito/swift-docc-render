@@ -8,8 +8,8 @@
  * See https://swift.org/CONTRIBUTORS.txt for Swift project authors
 */
 
-import { fetchLocalJSON } from 'docc-render/utils/fetch-local-text';
 import get from 'docc-render/utils/get';
+import { resolveAbsoluteUrl } from 'docc-render/utils/url-helper';
 
 /**
  * Theme settings state.
@@ -23,13 +23,15 @@ export const themeSettingsState = {
 export const { baseUrl } = window;
 
 /**
- * Fetch the theme settings and store in local module state.
+ * Fetches the theme settings and store in local module state.
  * Method is called before Vue boots in `main.js`.
  * @return {Promise<{}>}
  */
 export async function fetchThemeSettings() {
-  return fetchLocalJSON('/theme-settings.json')
-    .catch(() => {});
+  const url = resolveAbsoluteUrl('/theme-settings.json');
+  return fetch(url)
+    .then(r => r.json())
+    .catch(() => ({}));
 }
 
 export const getSetting = (path, fallback) => get(themeSettingsState, path, fallback);

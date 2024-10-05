@@ -8,8 +8,7 @@
  * See https://swift.org/CONTRIBUTORS.txt for Swift project authors
 */
 
-import assertIsArray from 'docc-render/utils/arrays';
-import { fetchLocalJSON, fetchLocalText } from 'docc-render/utils/fetch-local-text';
+import fetchText from 'docc-render/utils/fetch-text';
 import {
   copyPresentProperties,
   copyPropertyIfPresent,
@@ -79,26 +78,25 @@ function addScriptElement(customScript) {
 
     scriptElement.src = customScript.url;
 
-    // We can't use copyPropertyIfPresent or copyPresentProperties for 'cross-origin' because
-    // customScript and scriptElement spell this property differently.
-    if (has(customScript, 'cross-origin')) {
-      scriptElement.crossOrigin = customScript['cross-origin'];
-    }
-
     copyPresentProperties(['async', 'defer', 'integrity'], customScript, scriptElement);
+
+    // If `integrity` is set on an external script, then CORS must be enabled as well.
+    if (has(customScript, 'integrity')) {
+      scriptElement.crossOrigin = 'anonymous';
+    }
   } else if (has(customScript, 'name')) {
     mustNotHave(customScript, 'code', 'Custom script cannot have both `name` and `code`.');
 
     scriptElement.src = urlGivenScriptName(customScript.name);
 
-    copyPresentProperties(['async', 'defer'], customScript, scriptElement);
+    copyPresentProperties(['async', 'defer', 'integrity'], customScript, scriptElement);
   } else if (has(customScript, 'code')) {
     mustNotHave(customScript, 'async', 'Inline script cannot be `async`.');
     mustNotHave(customScript, 'defer', 'Inline script cannot have `defer`.');
 
     scriptElement.innerHTML = customScript.code;
   } else {
-    throw new Error('Custom script has neither `url` nor `code`.');
+    throw new Error('Custom script does not have `url`, `name`, or `code` properties.');
   }
 
   document.head.appendChild(scriptElement);
@@ -116,33 +114,66 @@ async function evalScript(customScript) {
     mustNotHave(customScript, 'name', 'Custom script cannot have both `url` and `name`.');
     mustNotHave(customScript, 'code', 'Custom script cannot have both `url` and `code`.');
 
-    codeToEval = await fetchLocalText(customScript.url);
+    if (has(customScript, 'integrity')) {
+      // External script with integrity. Must also use CORS.
+      codeToEval = await fetchText(customScript.url, {
+        integrity: customScript.integrity,
+        crossOrigin: 'anonymous',
+      });
+    } else {
+      // External script without integrity.
+      codeToEval = await fetchText(customScript.url);
+    }
   } else if (has(customScript, 'name')) {
     mustNotHave(customScript, 'code', 'Custom script cannot have both `name` and `code`.');
 
-    codeToEval = await fetchLocalText(urlGivenScriptName(customScript.name));
+    const url = urlGivenScriptName(customScript.name);
+
+    if (has(customScript, 'integrity')) {
+      // Local script with integrity. Do not use CORS.
+      codeToEval = await fetchText(url, { integrity: customScript.integrity });
+    } else {
+      // Local script without integrity.
+      codeToEval = await fetchText(url);
+    }
   } else if (has(customScript, 'code')) {
     codeToEval = customScript.code;
   } else {
-    throw new Error('Custom script has neither `url` nor `code`.');
+    throw new Error('Custom script does not have `url`, `name`, or `code` properties.');
   }
 
   // eslint-disable-next-line no-eval
   eval(codeToEval);
 }
 
+/**
+ * Run all custom scripts that pass the `predicate` using the `executor`.
+ * @param {(customScript: object) => boolean} predicate
+ * @param {(customScript: object) => void} executor
+ * @returns {Promise<void>}
+ */
+async function runCustomScripts(predicate, executor) {
+  const customScriptsFileName = 'custom-scripts.json';
+  const url = resolveAbsoluteUrl(`/${customScriptsFileName}`);
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    // If the file is absent, fail silently.
+    return;
+  }
+
+  const customScripts = await response.json();
+  if (!Array.isArray(customScripts)) {
+    throw new Error(`Content of ${customScriptsFileName} should be an array.`);
+  }
+
+  customScripts.filter(predicate).forEach(executor);
+}
+
 export async function runCustomPageLoadScripts() {
-  return fetchLocalJSON('/custom-scripts.json')
-    .then(assertIsArray)
-    .then(customScripts => customScripts.filter(shouldRunOnPageLoad))
-    .then(customScripts => customScripts.forEach(addScriptElement));
-  // .catch(() => ({}));
+  runCustomScripts(shouldRunOnPageLoad, addScriptElement);
 }
 
 export async function runCustomNavigateScripts() {
-  return fetchLocalJSON('/custom-scripts.json')
-    .then(assertIsArray)
-    .then(customScripts => customScripts.filter(shouldRunOnNavigate))
-    .then(customScripts => customScripts.forEach(evalScript));
-  // .catch(() => ({}));
+  runCustomScripts(shouldRunOnNavigate, evalScript);
 }
