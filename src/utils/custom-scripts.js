@@ -171,9 +171,9 @@ async function runCustomScripts(predicate, executor) {
 }
 
 export async function runCustomPageLoadScripts() {
-  runCustomScripts(shouldRunOnPageLoad, addScriptElement);
+  await runCustomScripts(shouldRunOnPageLoad, addScriptElement);
 }
 
 export async function runCustomNavigateScripts() {
-  runCustomScripts(shouldRunOnNavigate, evalScript);
+  await runCustomScripts(shouldRunOnNavigate, evalScript);
 }
