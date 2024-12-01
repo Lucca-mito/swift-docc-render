@@ -8,7 +8,6 @@
  * See https://swift.org/CONTRIBUTORS.txt for Swift project authors
 */
 
-import fetchText from 'docc-render/utils/fetch-text';
 import {
   copyPresentProperties,
   copyPropertyIfPresent,
@@ -81,7 +80,6 @@ function addScriptElement(customScript) {
 
   if (has(customScript, 'url')) {
     mustNotHave(customScript, 'name', 'Custom script cannot have both `url` and `name`.');
-    mustNotHave(customScript, 'code', 'Custom script cannot have both `url` and `code`.');
 
     scriptElement.src = customScript.url;
 
@@ -101,71 +99,33 @@ function addScriptElement(customScript) {
       scriptElement.crossOrigin = 'anonymous';
     }
   } else if (has(customScript, 'name')) {
-    mustNotHave(customScript, 'code', 'Custom script cannot have both `name` and `code`.');
-
     scriptElement.src = urlGivenScriptName(customScript.name);
     scriptElement.async = customScript.async || false;
 
-    copyPresentProperties(['async', 'defer', 'integrity'], customScript, scriptElement);
-  } else if (has(customScript, 'code')) {
-    mustNotHave(customScript, 'async', 'Inline script cannot be `async`.');
-    mustNotHave(customScript, 'defer', 'Inline script cannot have `defer`.');
-    mustNotHave(customScript, 'integrity', 'Inline script cannot have `integrity`.');
-
-    scriptElement.innerHTML = customScript.code;
+    copyPresentProperties(['defer', 'integrity'], customScript, scriptElement);
   } else {
-    throw new Error('Custom script does not have `url`, `name`, or `code` properties.');
+    throw new Error('Custom script has neither a `url` nor a `name` property.');
   }
 
   document.head.appendChild(scriptElement);
 }
 
 /**
- * Run the custom script using `eval`. Useful for running a custom script anytime after page load,
- * namely when the reader navigates to a subpage.
+ * Run the custom script using a dynamic import. Useful for running a custom script anytime after
+ * page load, namely when the reader navigates to a subpage.
  * @param {object} customScript The custom script, assuming it should be run on navigate.
  */
-async function evalScript(customScript) {
-  let codeToEval;
-
+async function importScript(customScript) {
+  // For why we have to use `webpackIgnore: true` here,
+  // see https://webpack.js.org/api/module-methods/#dynamic-expressions-in-import.
   if (has(customScript, 'url')) {
     mustNotHave(customScript, 'name', 'Custom script cannot have both `url` and `name`.');
-    mustNotHave(customScript, 'code', 'Custom script cannot have both `url` and `code`.');
-
-    if (has(customScript, 'integrity')) {
-      // External script with integrity. Must also use CORS.
-      codeToEval = await fetchText(customScript.url, {
-        integrity: customScript.integrity,
-        crossOrigin: 'anonymous',
-      });
-    } else {
-      // External script without integrity.
-      codeToEval = await fetchText(customScript.url);
-    }
+    await import(/* webpackIgnore: true */ customScript.url);
   } else if (has(customScript, 'name')) {
-    mustNotHave(customScript, 'code', 'Custom script cannot have both `name` and `code`.');
-
-    const url = urlGivenScriptName(customScript.name);
-
-    if (has(customScript, 'integrity')) {
-      // Local script with integrity. Do not use CORS.
-      codeToEval = await fetchText(url, { integrity: customScript.integrity });
-    } else {
-      // Local script without integrity.
-      codeToEval = await fetchText(url);
-    }
-  } else if (has(customScript, 'code')) {
-    mustNotHave(customScript, 'async', 'Inline script cannot be `async`.');
-    mustNotHave(customScript, 'defer', 'Inline script cannot have `defer`.');
-    mustNotHave(customScript, 'integrity', 'Inline script cannot have `integrity`.');
-
-    codeToEval = customScript.code;
+    await import(/* webpackIgnore: true */ urlGivenScriptName(customScript.name));
   } else {
-    throw new Error('Custom script does not have `url`, `name`, or `code` properties.');
+    throw new Error('Custom script has neither a `url` nor a `name` property.');
   }
-
-  // eslint-disable-next-line no-eval
-  eval(codeToEval);
 }
 
 /**
@@ -205,5 +165,5 @@ export async function runCustomPageLoadScripts() {
  * @returns {Promise<void>}
  */
 export async function runCustomNavigateScripts() {
-  await runCustomScripts(shouldRunOnNavigate, evalScript);
+  await runCustomScripts(shouldRunOnNavigate, importScript);
 }
