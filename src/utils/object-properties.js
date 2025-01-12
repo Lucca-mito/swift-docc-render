@@ -8,8 +8,6 @@
  * See https://swift.org/CONTRIBUTORS.txt for Swift project authors
 */
 
-/* eslint-disable */
-
 /** Convenient shorthand for `Object.hasOwn`. */
 export const has = Object.hasOwn;
 /**
