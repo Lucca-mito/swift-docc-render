@@ -17,6 +17,13 @@ import {
 } from 'docc-render/utils/object-properties';
 import { resolveAbsoluteUrl } from 'docc-render/utils/url-helper';
 
+/** Enum for the allowed values of the `run` property in a custom script. */
+const Run = {
+  onLoad: 'on-load',
+  onLoadAndNavigate: 'on-load-and-navigate',
+  onNavigate: 'on-navigate',
+};
+
 /**
  * Returns whether the custom script should be run when the reader navigates to a subpage.
  * @param {object} customScript
@@ -25,7 +32,7 @@ import { resolveAbsoluteUrl } from 'docc-render/utils/url-helper';
  */
 function shouldRunOnPageLoad(customScript) {
   return !has(customScript, 'run')
-    || customScript.run === 'on-load' || customScript.run === 'on-load-and-navigate';
+    || customScript.run === Run.onLoad || customScript.run === Run.onLoadAndNavigate;
 }
 
 /**
@@ -36,7 +43,7 @@ function shouldRunOnPageLoad(customScript) {
  */
 function shouldRunOnNavigate(customScript) {
   return has(customScript, 'run')
-    && (customScript.run === 'on-navigate' || customScript.run === 'on-load-and-navigate');
+    && (customScript.run === Run.onNavigate || customScript.run === Run.onLoadAndNavigate);
 }
 
 /**
@@ -78,7 +85,7 @@ function addScriptElement(customScript) {
 
     scriptElement.src = customScript.url;
 
-    // Dynamically-created script elements are `async` by default. But we don't want custom 
+    // Dynamically-created script elements are `async` by default. But we don't want custom
     // scripts to be implicitly async by default, because if a documentation author adds `defer` to
     // some or all of their custom scripts (meaning that they want the execution order of those
     // scripts to be deterministic), then the author's `defer` will be overriden by the implicit
