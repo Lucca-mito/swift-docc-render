@@ -158,10 +158,10 @@ function rerunScriptElement(customScript) {
 }
 
 /**
- * Fetches the custom scripts declared in custom-scripts.json.
+ * Fetches the custom scripts declared in custom-scripts.json from the server.
  * @returns {Promise<object[]>} The custom scripts, or an empty array if the file is absent.
  */
-async function fetchCustomScripts() {
+async function fetchCustomScriptsFromServer() {
   const customScriptsFileName = 'custom-scripts.json';
   const url = resolveAbsoluteUrl(`/${customScriptsFileName}`);
 
@@ -177,6 +177,24 @@ async function fetchCustomScripts() {
   }
 
   return customScripts;
+}
+
+/** The custom scripts, fetched once and then reused for every routing event. */
+let customScriptsPromise;
+
+/**
+ * Fetches the custom scripts declared in custom-scripts.json, only requesting the file once.
+ * @returns {Promise<object[]>} The custom scripts, or an empty array if the file is absent.
+ */
+function fetchCustomScripts() {
+  if (!customScriptsPromise) {
+    customScriptsPromise = fetchCustomScriptsFromServer().catch((error) => {
+      // Don't cache the failure, so that the next routing event tries again.
+      customScriptsPromise = undefined;
+      throw error;
+    });
+  }
+  return customScriptsPromise;
 }
 
 /**
